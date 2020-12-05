@@ -1,0 +1,198 @@
+---
+title: "Child Mortality and Infrastructure"
+author: "Ada Zhou"
+date: "`r Sys.Date()`"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Libraries
+library(tidyverse)
+
+# Parameters
+file_data <- here::here("c01-own/data/infrastructure_child_mortality.rds")
+
+world_regions <- 
+  c(
+    "8S",
+    "ZG", #Sub-Saharan Africa
+    "Z4",
+    "ZQ",
+    "Z7",
+    "ZJ",
+    "XU"
+  )
+
+group_codes <- 
+  c(
+    "1A",
+    "S3",
+    "B8",
+    "V2",
+    "Z4",
+    "4E",
+    "T4",
+    "XC",
+    "Z7",
+    "7E",
+    "T7",
+    "EU",
+    "F1",
+    "XE",
+    "XD",
+    "XF",
+    "ZT",
+    "XH",
+    "XI",
+    "XG",
+    "V3",
+    "ZJ",
+    "XJ",
+    "T2",
+    "XL",
+    "XO",
+    "XM",
+    "XN",
+    "ZQ",
+    "XQ",
+    "T3",
+    "XP", #MIDDLE INCOME
+    "XU",
+    "XY",
+    "OE",
+    "S4",
+    "S2",
+    "V4",
+    "V1",
+    "S1",
+    "8S",
+    "T5",
+    "ZG",
+    "ZF",
+    "T6",
+    "XT", #UPPER MIDDLE INCOME
+    "1W"
+  )
+
+#===============================================================================
+
+df <- read_rds(file_data)
+```
+
+```{r, fig.height=10, fig.width=10}
+
+plot_relationship <- function(infrastructure) {
+  df %>% 
+  drop_na({{infrastructure}}, child_mortality) %>%
+  filter(iso2c %in% world_regions) %>% 
+  ggplot(aes({{infrastructure}}, child_mortality, color = country)) +
+  geom_point() +
+  geom_line()
+}
+
+df %>% 
+  pivot_longer(
+    cols = c(contains("urban"), contains("rural")),
+    names_to = "infrastructure",
+    values_to = "pop_percent"
+  ) %>% 
+  drop_na(child_mortality, pop_percent) %>% 
+  filter(iso2c %in% world_regions) %>% 
+  arrange(year) %>% 
+  ggplot(aes(pop_percent, child_mortality, color = country)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(vars(infrastructure)) +
+  scale_x_continuous(
+    breaks = seq(0, 100, by = 20),
+    limits = c(0, 110),
+    minor_breaks = NULL
+  ) +
+  theme(legend.position = "bottom") 
+
+```
+```{r}
+df %>% 
+  pivot_longer(
+    cols = c(contains("urban"), contains("rural")),
+    names_to = "infrastructure",
+    values_to = "pop_percent"
+  ) %>% 
+  drop_na(pop_percent) %>%
+  filter(iso2c == "ZG", infrastructure %in% c("sanitation_rural", "sanitation_urban")) %>% 
+  arrange(year) %>%
+  ggplot(aes(pop_percent, child_mortality, color = infrastructure)) +
+  geom_line() +
+  geom_point()
+
+infrastructure_type_recode <- 
+  c(
+    "electricity_urban" = "Electricity - Urban",
+    "electricity_rural" = "Electricity - Rural",
+    "sanitation_urban" = "Santiation - Urban",
+    "sanitation_rural" = "Sanitation - Rural",
+    "water_urban" = "Water - Urban",
+    "water_rural" = "Water - Rural"
+  )
+
+df %>% 
+  pivot_longer(
+    cols = c(contains("urban"), contains("rural")),
+    names_to = "infrastructure",
+    values_to = "pop_percent"
+  ) %>% 
+  drop_na(pop_percent, child_mortality) %>% 
+  group_by(year, infrastructure) %>% 
+  summarize(r = cor(pop_percent, child_mortality)) %>% 
+  ggplot(aes(year, r, color = infrastructure)) +
+  geom_line() +
+  geom_point() +
+  ggrepel::geom_text_repel(
+    aes(label = recode(infrastructure, !!! infrastructure_type_recode)),
+    hjust = -0.1,
+    size = 2,
+    direction = "y",
+    data = . %>% group_by(infrastructure) %>% filter(year == max(year))
+  ) +
+  scale_x_continuous(
+    breaks = seq(1990, 2017, by = 2),
+    limits = c(2000, 2019)
+  ) +
+  scale_y_continuous(
+    breaks = scales::breaks_width(0.1)
+  ) +
+  theme(
+    legend.position = "none",
+    plot.caption = element_text(size = 3)
+  ) +
+  labs(
+    title = "Correlation Between Child Mortality and Infrastructure Access",
+    x = "Year",
+    y = "Correlation",
+    captions = 
+      "Source: World Bank Indicators - EG.ELC.ACCS.UR.ZS, EG.ELC.ACCS.RU.ZS, SH.H2O.BASW.UR.ZS, SH.H2O.BASW.RU.ZS, SH.STA.BASS.UR.ZS, SH.STA.BASS.RU.ZS"
+  )
+
+```
+
+```{r}
+
+#     "8S", # South Asia
+#     "ZG", # Sub-Saharan Africa
+#     "Z4", # East Asia & Pacific
+#     "ZQ", # Middle East & North Africa
+#     "Z7", # Europe & Central Asia
+#     "ZJ", # Latin America & Caribbean
+#     "XU"  # North America
+
+df %>% 
+  filter(iso2c == "XU")
+```
+
+

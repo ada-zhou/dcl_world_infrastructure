@@ -1,0 +1,160 @@
+---
+title: Urban Growth
+author: Ada Zhou
+date: "`r Sys.Date()`"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Libraries
+library(tidyverse)
+
+# Parameters
+file_data <- here::here("c01-own/data/urban_growth.rds")
+
+#XD: HIGH INCOME
+#XO: LOW & MIDDLE INCOME
+#XM: LOW INCOME
+#XN: LOWER MIDDLE INCOME
+#XP: MIDDLE INCOME
+#XT: UPPER MIDDLE INCOME
+
+world_regions <- 
+  c(
+    "8S",
+    "ZG",
+    "Z4",
+    "ZQ",
+    "Z7",
+    "ZJ",
+    "XU"
+  )
+
+group_codes <- 
+  c(
+    "1A",
+    "S3",
+    "B8",
+    "V2",
+    "Z4",
+    "4E",
+    "T4",
+    "XC",
+    "Z7",
+    "7E",
+    "T7",
+    "EU",
+    "F1",
+    "XE",
+    "XD",
+    "XF",
+    "ZT",
+    "XH",
+    "XI",
+    "XG",
+    "V3",
+    "ZJ",
+    "XJ",
+    "T2",
+    "XL",
+    "XO",
+    "XM",
+    "XN",
+    "ZQ",
+    "XQ",
+    "T3",
+    "XP", #MIDDLE INCOME
+    "XU",
+    "XY",
+    "OE",
+    "S4",
+    "S2",
+    "V4",
+    "V1",
+    "S1",
+    "8S",
+    "T5",
+    "ZG",
+    "ZF",
+    "T6",
+    "XT", #UPPER MIDDLE INCOME
+    "1W"
+  )
+
+#===============================================================================
+df <- read_rds(file_data)
+
+```
+
+```{r}
+df %>% 
+  summary()
+
+df %>% 
+  top_n(-1, urban_growth)
+```
+
+
+## Highest Urban Population Growth
+
+Removed extreme outlier of near 50% growth in 1980. Looking closely, it's Cambodia.
+```{r}
+df %>%
+  drop_na(urban_growth) %>%
+  filter(!iso2c %in% group_codes) %>% 
+  group_by(iso2c) %>% 
+  top_n(1, urban_growth) %>% 
+  ggplot(aes(x = year, y = urban_growth)) +
+  geom_boxplot(aes(group = cut_width(year, 5)), varwidth = TRUE) +
+  scale_x_continuous(breaks = seq(1960, 2020, 5)) 
+
+df %>%
+  drop_na(urban_growth) %>%
+  filter(!iso2c %in% group_codes, iso2c != "KH") %>% 
+  group_by(iso2c) %>% 
+  top_n(1, urban_growth) %>% 
+  ggplot(aes(x = year, y = urban_growth)) +
+  geom_boxplot(aes(group = cut_width(year, 5)), varwidth = TRUE) +
+  scale_x_continuous(breaks = seq(1960, 2020, 5)) 
+
+```
+```{r}
+df %>%
+  filter(!(iso2c %in% regions), year == 1980) %>% 
+  group_by(iso2c) %>% 
+  top_n(1, urban_growth)
+
+df %>% 
+  drop_na(urban_growth) %>% 
+  filter(iso2c == "KH")
+
+df %>% 
+  drop_na(urban_growth) %>% 
+  filter(iso2c == "KH") %>% 
+  ggplot(aes(x = year, y = urban_growth)) + 
+  geom_line()
+```
+
+### Regions
+
+```{r}
+
+df %>%
+  filter(
+    iso2c %in% world_regions
+  ) %>% 
+  drop_na(urban_growth)  %>% 
+  ggplot(aes(year, urban_growth, color = country)) +
+  geom_line() +
+  theme(
+    legend.position = "bottom"
+  )
+  
+```
+

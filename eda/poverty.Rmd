@@ -1,0 +1,81 @@
+---
+title: "Poverty"
+author: "Ada"
+date: "`r Sys.Date()`"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Libraries
+library(tidyverse)
+
+# Parameters
+file_data <- here::here("c01-own/data/poverty.rds")
+#===============================================================================
+
+df <- read_rds(file_data)
+```
+
+```{r}
+df %>% 
+  summary()
+```
+```{r}
+
+df %>% 
+  drop_na(poverty_urban, poverty_rural) %>% 
+  pivot_longer(
+    cols = contains("poverty"),
+    names_to = "u_r",
+    values_to = "poverty_percent"
+  ) %>% 
+  ggplot(aes(year, poverty_percent)) +
+  geom_point() +
+  facet_wrap(vars(u_r))
+```
+
+
+```{r}
+df %>% 
+  drop_na(poverty_urban, poverty_rural) %>%
+  pivot_longer(
+    cols = contains("poverty"),
+    names_to = "u_r",
+    values_to = "poverty_percent"
+  ) %>% 
+  ggplot(aes(poverty_percent)) +
+  geom_histogram(binwidth = 2) +
+  facet_grid(rows = vars(u_r))
+```
+
+
+```{r}
+df %>% 
+  drop_na(poverty_urban, poverty_rural) %>% 
+  pivot_longer(
+    cols = contains("poverty"),
+    names_to = "u_r",
+    values_to = "poverty_percent"
+  ) %>% 
+  ggplot(aes(year, poverty_percent)) +
+  geom_boxplot(aes(group = cut_width(year, 5)), position = "dodge") +
+  facet_grid(cols = vars(u_r)) 
+
+```
+
+```{r}
+df %>% 
+  drop_na(poverty_urban, poverty_rural) %>% 
+  mutate(
+    diff = poverty_rural - poverty_urban
+  ) %>% 
+  ggplot(aes(year, diff)) +
+  geom_point()
+```
+

@@ -1,0 +1,52 @@
+---
+title: "Project proposal 2"
+author: "Ada"
+date: "`r Sys.Date()`"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+This project will look at different physical urbanization development indicators across the world in relation to more quality of life type urbanization indicators. The urbanization indicators will include shelter (ex: housing tenure and price, rent-to-income, housing ownership/privatization, land price, etc), infrastructure (ex: access to water, electricity, telephone, sewerage, etc.), transport (types of transport, commute times), local government (city public/private partnerships, revenue, expenditure, etc.). The quality of life indicators will include equality in countries + urban/rural, eduacation, crime, health, etc. which ultimately will be compared to happiness. This divide of indicators is to pinpoint how concrete physical changes to the urban landscape affect the life of the people living in places which then affects happiness. Initially there will be a study of patterns and trends in the indicators that occur during urbanization to better understand the variables.  
+
+## Data
+
+Most of the data will come from [World Bank Data](https://data.worldbank.org/indicator#topic-16) and the rest will come from [UN Habitat Data](http://urbandata.unhabitat.org/download-raw-data) and [Gallup](https://www.gallup.com/analytics/247355/gallup-world-happiness-report.aspx) when accessible. 
+
+## Goals
+
+* Uncover historical trends in the development indicators across countries 
+  * What patterns occur before rapid urbanization?
+  * What components of a city develops before another component?
+  * What components of cities predict others?
+  * What countries are similar to each other? 
+* How do phsyical shifts in the city affect life in cities?
+  * How are happiness/education/equality/health affected?
+* What factors about a city are indicative of a happy population? 
+
+## Links
+* [UN Habitat Graphs](https://unhabitat.org/sites/default/files/download-manager-files/Global%20Urban%20Indicators%20Database.pdf)
+* [List of Datasets](https://guides.lib.berkeley.edu/c.php?g=413325&p=2816636)
+  * [World Bank Data](https://data.worldbank.org/indicator#topic-16)
+  * [UN Habitat Data](http://urbandata.unhabitat.org/download-raw-data)
+  * [Gallup Happiness](https://www.gallup.com/analytics/247355/gallup-world-happiness-report.aspx)
+
+## Aspect for Challenge
+
+The aspect of this project that can be a challenge could be the part on uncovering what urban development indicators go with a happy population. What countries have high happiness rating and what, if any, are the patterns in the indicators amongst high happiness countries?
+
+## Project Decomposition
+
+* **Progress Report 1:** Download, read, clean data. Make initial graphs exploring the physical indicators individually and their historical patterns.  
+* **Progress Report 2:** Start exploring the nonphsyical indicators. Compare the two groups of indicators with each other. Make visualizations of any interesting dynamics and trends.
+* **Challenge for Team:** Focus on the Happiness measures in relation to each country's urban/rural divide, education, equality, etc. 
+* **Final Report:** Finish up more specific country comparisons and further patterns in indicators. Write up report. Pick out the physical changes to an urban landscape that affect the qaulity of life indicators that then correlate highly to happiness or diagnose aspects of cities that can improve inhabitants well-being. 
+
+
+

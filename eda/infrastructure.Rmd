@@ -1,0 +1,802 @@
+---
+title: Infrastructure
+author: Ada Zhou
+date: "`r Sys.Date()`"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Libraries
+library(tidyverse)
+library(sf)
+
+# Parameters
+
+ROBINSON <- "+proj=robin +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
+
+file_data <- here::here("c01-own/data/infrastructure.rds")
+map_file_path <- 
+    here::here(
+        "../../archive/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp"
+    )
+world_regions <- 
+  c(
+    "8S",
+    "ZG",
+    "Z4",
+    "ZQ",
+    "Z7",
+    "ZJ",
+    "XU"
+  )
+
+group_codes <- 
+  c(
+    "1A",
+    "S3",
+    "B8",
+    "V2",
+    "Z4",
+    "4E",
+    "T4",
+    "XC",
+    "Z7",
+    "7E",
+    "T7",
+    "EU",
+    "F1",
+    "XE",
+    "XD",
+    "XF",
+    "ZT",
+    "XH",
+    "XI",
+    "XG",
+    "V3",
+    "ZJ",
+    "XJ",
+    "T2",
+    "XL",
+    "XO",
+    "XM",
+    "XN",
+    "ZQ",
+    "XQ",
+    "T3",
+    "XP", #MIDDLE INCOME
+    "XU",
+    "XY",
+    "OE",
+    "S4",
+    "S2",
+    "V4",
+    "V1",
+    "S1",
+    "8S",
+    "T5",
+    "ZG",
+    "ZF",
+    "T6",
+    "XT", #UPPER MIDDLE INCOME
+    "1W"
+  )
+
+#===============================================================================
+
+df <- read_rds(file_data)
+
+countries <- read_sf(map_file_path)
+```
+
+### Checking Data
+
+```{r}
+df %>% 
+  summary()
+
+df %>% 
+  count(
+    electricity_urban_na = is.na(electricity_urban),
+    electricity_rural_na = is.na(electricity_rural),
+    water_urban_na = is.na(water_urban),
+    water_rural_na = is.na(water_rural),
+    sanitation_urban_na = is.na(sanitation_urban),
+    sanitation_rural_na = is.na(sanitation_rural)
+  ) 
+```
+
+### Tidying Data
+
+```{r}
+df <- 
+  df %>% 
+  drop_na(
+    electricity_urban, 
+    electricity_rural,
+    water_urban,
+    water_rural,
+    sanitation_urban,
+    sanitation_rural
+  ) %>% 
+  pivot_longer(
+    cols = c(contains("urban"), contains("rural")),
+    names_to = c("infrastructure", "u_r"),
+    names_sep = "_",
+    values_to = "pop_percent"
+  )
+```
+
+### Mexico Data
+
+```{r}
+df %>% 
+  filter(country == "Mexico") %>% 
+  ggplot(aes(year, pop_percent, color = infrastructure)) +
+  geom_point() +
+  facet_wrap(vars(u_r))
+```
+
+### World Infrastructure Data
+
+```{r}
+#world
+df %>% 
+  filter(iso2c == "1W", year == "2017") %>% 
+  ggplot(aes(x = infrastructure, y = pop_percent, fill = u_r)) +
+  geom_col(position = "dodge")
+```
+
+```{r}
+
+df %>% 
+  filter(
+    iso2c %in% world_regions
+  ) %>% 
+  ggplot(aes(year, pop_percent, color = country)) +
+  geom_line() +
+  facet_grid(rows = vars(infrastructure), cols = vars(u_r))
+
+```
+
+
+### Difference between urban and rural infrastructure in regions
+
+```{r}
+
+df %>%
+  pivot_wider(
+    names_from = c(u_r, infrastructure), 
+    values_from = pop_percent
+  ) %>% 
+  mutate(
+    e_diff = urban_electricity - rural_electricity,
+    w_diff = urban_water - rural_water,
+    s_diff = urban_sanitation - rural_sanitation
+  ) %>% 
+  filter(
+    iso2c %in% world_regions
+  ) %>% 
+  drop_na(e_diff, w_diff, s_diff) %>%
+  select(iso2c, country, year, contains("diff")) %>% 
+  pivot_longer(
+    cols = contains("diff"),
+    names_to = "difference",
+    values_to = "value"
+  ) %>% 
+  ggplot(aes(x = year, y = value, color = country)) +
+  geom_line() +
+  facet_grid(rows = vars(difference))
+```
+
+### Sanitation 
+
+```{r, fig.height=10}
+
+lowest_sanitation_rural <- 
+  df %>% 
+  filter(
+    !(iso2c %in% group_codes), 
+    infrastructure == "sanitation",
+    u_r == "rural",
+    year == max(year, na.rm = TRUE)
+  ) %>% 
+  top_n(-50, pop_percent) %>% 
+  pull(iso2c)
+
+df %>% 
+  filter(
+    iso2c %in% lowest_sanitation_rural,
+    u_r == "rural",
+    infrastructure == "sanitation"
+  ) %>% 
+  pivot_wider(
+    names_from = year,
+    names_prefix = "year_",
+    values_from = "pop_percent"
+  ) %>% 
+  mutate(country = fct_reorder(country, year_2017)) %>% 
+  drop_na(year_2007) %>%  
+  ggplot(aes(y = country)) +
+  geom_vline(aes(xintercept = median(year_2017)), color = "blue") +
+  geom_vline(aes(xintercept = median(year_2007)), color = "red") +
+  geom_segment(
+    aes(
+      x = year_2007, 
+      xend = year_2017, 
+      y = country, 
+      yend = country
+    )
+  ) +
+  geom_point(aes(x = year_2007, color = "2007")) +
+  geom_point(aes(x = year_2017, color = "2017"))
+  
+```
+
+```{r, fig.height=10}
+
+lowest_sanitation_urban <- 
+  df %>% 
+  filter(
+    !(iso2c %in% group_codes), 
+    infrastructure == "sanitation",
+    u_r == "urban",
+    year == max(year, na.rm = TRUE)
+  ) %>% 
+  top_n(-50, pop_percent) %>% 
+  pull(iso2c)
+
+df %>% 
+  filter(
+    iso2c %in% lowest_sanitation_rural,
+    u_r == "urban",
+    infrastructure == "sanitation"
+  ) %>% 
+  pivot_wider(
+    names_from = year,
+    names_prefix = "year_",
+    values_from = "pop_percent"
+  ) %>% 
+  mutate(country = fct_reorder(country, year_2017)) %>% 
+  drop_na(year_2007) %>%  
+  ggplot(aes(y = country)) +
+  geom_vline(aes(xintercept = median(year_2017)), color = "blue") +
+  geom_vline(aes(xintercept = median(year_2007)), color = "red") +
+  geom_segment(
+    aes(
+      x = year_2007, 
+      xend = year_2017, 
+      y = country, 
+      yend = country
+    )
+  ) +
+  geom_point(aes(x = year_2007, color = "2007")) +
+  geom_point(aes(x = year_2017, color = "2017"))
+```
+
+### Countries where percent population with access to infrastructure decreased  
+
+```{r}
+
+decreased <- 
+  df %>% 
+  unite("variable", infrastructure, u_r) %>% 
+  filter(year %in% c("2007", "2017")) %>% 
+  group_by(iso2c, country, variable) %>% 
+  arrange(iso2c, country, variable, year) %>% 
+  summarize(change = last(pop_percent, year) - first(pop_percent, year)) %>%
+  ungroup() %>% 
+  ungroup() %>% 
+  filter(change < 0) 
+
+graph_country <- function(iso2c, country) {
+  df %>% 
+    filter(
+      iso2c == {{iso2c}}
+    ) %>% 
+    ggplot(aes(x = year, y = pop_percent, color = u_r)) +
+    geom_line() +
+    geom_point() +
+    facet_grid(rows = vars(infrastructure)) +
+    scale_x_continuous(breaks = scales::breaks_width(2)) +
+    labs(
+      title = str_glue("{country} data")
+    )
+}
+
+decrease_plots <- 
+  decreased %>% 
+  filter(abs(change) > 1) %>% 
+  distinct(iso2c, country) %>%
+  pmap(graph_country)
+
+decrease_plots %>% walk(print)
+
+```
+
+
+### Decreasing Infrastructure
+
+```{r}
+
+graph_variable_decrease <- function(variable) {
+  df %>% 
+    unite("variable", infrastructure, u_r) %>% 
+    filter(
+      variable == {{variable}},
+      year > 2006,
+      iso2c %in% 
+        (decreased %>% 
+           filter(variable == {{variable}}, abs(change) > 1) %>% 
+           pull(iso2c)
+        ),
+      !(iso2c %in% group_codes)
+    ) %>% 
+    ggplot(aes(year, pop_percent, color = country)) +
+    geom_line() +
+    geom_point() +
+    scale_x_continuous(breaks = scales::breaks_width(1)) +
+    labs(
+      title = str_glue("Countries with decreasing {variable}")
+    )
+}
+
+graph_variable_decrease("electricity_rural")
+graph_variable_decrease("electricity_urban")
+graph_variable_decrease("water_rural")
+graph_variable_decrease("water_urban")
+graph_variable_decrease("sanitation_rural")
+graph_variable_decrease("sanitation_urban")
+
+decreased %>%
+  filter(!(iso2c %in% group_codes)) %>% 
+  count(variable) %>% 
+  ggplot(aes(fct_reorder(variable, n), n)) + 
+  geom_col() +
+  labs(
+    title = "Number of countries with a decrease in population percent access to infrastructure"
+  )
+
+```
+
+### Mean Decrease by infrastructure
+
+```{r}
+
+decreased %>%
+  filter(!(iso2c %in% group_codes)) %>%
+  group_by(variable) %>% 
+  summarize(mean = mean(change)) %>% 
+  ggplot(aes(fct_reorder(variable, mean), mean)) + 
+  geom_col()
+
+df %>% 
+  unite("variable", infrastructure, u_r) %>% 
+  filter(year %in% c("2007", "2017")) %>% 
+  group_by(iso2c, country, variable) %>% 
+  arrange(iso2c, country, variable, year) %>% 
+  summarize(change = last(pop_percent, year) - first(pop_percent, year)) %>% 
+  filter(!(iso2c %in% group_codes)) %>%
+  group_by(variable) %>% 
+  summarize(mean = mean(change)) %>% 
+  ggplot(aes(fct_reorder(variable, mean), mean)) + 
+  geom_col()
+
+```
+
+
+```{r, fig.height=10}
+# India
+ df %>% 
+  filter(
+    iso2c == "IN"
+  ) %>% 
+  ggplot(aes(x = year, y = pop_percent, color = infrastructure)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(vars(u_r)) +
+  scale_x_continuous(breaks = scales::breaks_width(2)) +
+  theme(legend.position = "bottom")
+
+```
+
+
+```{r}
+
+top_bottom <- function(infrastructure, u_r, n) {
+  df %>%
+  filter(
+    !(iso2c %in% group_codes),
+    infrastructure == {{infrastructure}},
+    year == 2017,
+    u_r == {{u_r}}
+  ) %>% 
+  top_n(n, pop_percent) %>% 
+  arrange(desc(pop_percent))
+}
+
+top_bottom("electricity", "urban", -10)
+top_bottom("sanitation", "urban", -10)
+top_bottom("water", "urban", -10)
+top_bottom("electricity", "rural", -10)
+top_bottom("sanitation", "rural", -10)
+top_bottom("water", "rural", -10)
+ 
+```
+
+```{r, fig.height=20, fig.width=10}
+
+graphs_top_bottom <- function(infrastructure, u_r, n) {
+  df %>% 
+  filter(
+    iso2c %in% top_bottom({{infrastructure}}, {{u_r}}, n)$iso2c,
+    u_r == {{u_r}}
+  ) %>% 
+  ggplot(aes(x = year, y = pop_percent, color = infrastructure)) +
+  geom_line() +
+  facet_wrap(vars(country), ncol = 2) +
+  theme(legend.position = "bottom")
+}
+
+graphs_top_bottom("electricity", "rural", -10)
+graphs_top_bottom("sanitation", "rural", -10)
+graphs_top_bottom("water", "rural", -10)
+graphs_top_bottom("electricity", "urban", -10)
+graphs_top_bottom("sanitation", "urban", -10)
+graphs_top_bottom("water", "urban", -10)
+
+```
+
+### Maps
+
+```{r}
+
+country_df <- 
+  df %>% 
+  pivot_wider(
+    names_from = c(infrastructure, u_r), 
+    values_from = pop_percent
+  ) %>% 
+  left_join(countries, ., by = c("ISO_A2" = "iso2c"))
+
+
+
+maps_infrastructure <- function(infrastructure, year) {
+  country_df %>% 
+    filter(year == {{year}}) %>% 
+    ggplot() +
+    geom_sf(aes(fill = {{infrastructure}})) +
+    scale_fill_viridis_c(labels = scales::label_percent(scale = 1)) +
+    guides(
+      fill = 
+        guide_colorbar(
+          barheight = 0.5,
+          barwidth = 15,
+          title = NULL
+        )
+    ) +
+    theme_void() +
+    theme(legend.position = "bottom") 
+}
+
+maps_infrastructure(electricity_urban, 2017) + 
+  labs(title = "Percent of Urban Population with Access to Electricity")
+maps_infrastructure(electricity_rural, 2017) +
+  labs(title = "Percent of Rural Population with Access to Electricity")
+maps_infrastructure(sanitation_urban, 2017) +
+  labs(title = "Percent of Urban Population with Sanitation")
+maps_infrastructure(sanitation_rural, 2017) +
+  labs(title = "Percent of Rural Population with Sanitation")
+maps_infrastructure(water_urban, 2017) +
+  labs(title = "Percent of Urban Population with Access to Water")
+maps_infrastructure(water_rural, 2017) +
+  labs(title = "Percent of Rural Population with Access to Water")
+
+```
+
+
+### Correlation between variables
+
+```{r}
+
+df %>% 
+  pivot_wider(
+    names_from = u_r,
+    values_from = pop_percent
+  ) %>% 
+  filter(year == "2017") %>% 
+  drop_na(urban, rural) %>% 
+  ggplot(aes(urban, rural)) +
+  geom_abline(slope = 1, color = "light blue") +
+  geom_point(alpha = 0.7) +
+  facet_grid(cols = vars(infrastructure)) +
+  coord_fixed()
+
+region_country <-
+  read_csv(file_region_country)
+
+df %>%
+  pivot_wider(
+    names_from = u_r,
+    values_from = population_percent
+  ) %>%
+  filter(
+    !(iso2c %in% group_codes),
+    year == "2017"
+  ) %>%
+  drop_na(urban, rural) %>%
+  left_join(region_country, by = c("country" = "CountryName")) %>%
+  ggplot(aes(urban, rural, color = GroupName)) +
+  geom_abline(slope = 1, color = "light blue") +
+  geom_point(alpha = 0.5, size = 1) +
+  facet_grid(cols = vars(infrastructure)) +
+  coord_fixed()
+
+# region_country <- 
+#   read_csv(file_region_country)
+# 
+# q2 %>% 
+#   filter(
+#     !(iso2c %in% group_codes)
+#   ) %>%
+#   drop_na(population_percent) %>% 
+#   distinct(iso2c, country) %>% 
+#   left_join(region_country, by = c("country" = "CountryName")) 
+
+```
+
+### Rural > Urban
+
+```{r}
+
+rural_greater <- 
+  df %>% 
+  pivot_wider(
+    names_from = u_r,
+    values_from = pop_percent
+  ) %>% 
+  filter(
+    rural - urban > 1
+  )
+
+rural_greater %>% 
+  distinct(iso2c, country, infrastructure) %>% 
+  knitr::kable()
+
+rural_greater %>% 
+  distinct(iso2c, country, infrastructure) %>% 
+  ggplot(aes(infrastructure)) +
+  geom_bar()
+
+rural_greater_plots <- 
+  rural_greater %>% 
+  distinct(iso2c, country) %>%
+  pmap(graph_country)
+
+rural_greater_plots %>% walk(print)
+
+
+```
+
+
+
+```{r, include=FALSE}
+df %>% 
+  unite("variable", infrastructure, u_r) %>% 
+  filter(
+    variable == "electricity_urban",
+    year > 2006,
+    iso2c %in% 
+      (decreased %>% filter(variable == "electricity_urban") %>% pull(iso2c)) 
+  ) %>% 
+  ggplot(aes(year, pop_percent, color = country)) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(breaks = scales::breaks_width(1)) +
+  coord_fixed(ylim = c(97, 100))
+
+df %>% 
+  unite("variable", infrastructure, u_r) %>% 
+  filter(
+    variable == "electricity_urban",
+    year > 2006,
+    iso2c %in% 
+      (decreased %>% filter(variable == "electricity_urban") %>% pull(iso2c)),
+    !(iso2c %in% group_codes)
+  ) %>% 
+  ggplot(aes(year, pop_percent, color = country)) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(breaks = scales::breaks_width(1)) +
+  theme(
+    legend.position = "bottom"
+  )
+
+```
+
+
+```{r}
+graph_country <- function(iso2c, infrastructure, u_r) {
+  q2 %>% 
+    filter(
+      iso2c == {{iso2c}},
+      infrastructure == {{infrastructure}},
+      u_r == {{u_r}}
+    ) %>% 
+    ggplot(aes(x = year, y = population_percent)) +
+    geom_line() +
+    geom_point() +
+    scale_x_continuous(breaks = scales::breaks_width(2)) +
+    labs(
+      title = str_glue("{iso2c} data"),
+      x = "Year",
+      y = str_glue("Access to {infrastructure} (Percent of Population)"),
+      captions = "Source: World Bank Data"
+    )
+}
+```
+
+__q4__ Graph the distribution of change for access to electricity, water and sanitation in urban and rural areas for every country. What information does the graphs tell you about the change in access to each infrastructure?
+
+Hint: Use the vector `group_codes` to select only country-level data.
+
+```{r, fig.height=10, fig.width=10}
+# solution-begin
+
+q4 <- 
+  q2 %>% 
+  filter(
+    !(iso2c %in% group_codes),
+    year %in% c("2007", "2017")
+  ) %>%
+  mutate(
+    u_r = ordered(
+      u_r,
+      levels = c("urban", "rural"),
+      labels = c("Urban", "Rural")
+    ),
+    infrastructure = 
+      ordered(
+        infrastructure, 
+        levels = c("water", "electricity", "sanitation"),
+        labels = c("Water", "Electricity", "Sanitation")
+      )
+  ) %>% 
+  drop_na(population_percent) %>%
+  group_by(infrastructure, u_r, iso2c) %>% 
+  arrange(iso2c, infrastructure, u_r, year) %>% 
+  summarize(
+    decade_change = 
+      last(population_percent, year) - first(population_percent, year)
+  ) %>% 
+  ungroup() %>% 
+  ggplot(aes(decade_change)) +
+  geom_histogram(binwidth = 5) +
+  geom_vline(
+    data = 
+      . %>% 
+      group_by(infrastructure, u_r) %>% 
+      summarize(median = median(decade_change)),
+    aes(xintercept = median, color = "median")
+  ) +
+  geom_vline(xintercept = 0, color = "black") +
+  facet_grid(rows = vars(infrastructure), cols = vars(u_r)) +
+  scale_x_continuous(
+    breaks = scales::breaks_width(25),
+    labels = scales::percent_format(scale = 1)
+  ) +
+  labs(
+    title = str_glue("Distribution of change to access to infrastructure from {YEAR_MIN} - {YEAR_MAX}"),
+    x = "Change to Access to Infrastructure (Percent of Population)",
+    y = NULL,
+    color = NULL
+  )
+# solution-end
+
+
+# task-begin
+# Print results
+if (exists("q4")) q4
+# task-end
+
+# Alternate Answer:
+# q3 <- 
+#   q2 %>% 
+#   filter(
+#     iso2c %in% world_regions
+#   ) %>% 
+#   mutate(
+#     u_r = 
+#       ordered(
+#         u_r, 
+#         levels = c("rural", "urban"), 
+#         labels = c("Rural", "Urban")
+#       ),
+#     infrastructure = 
+#       ordered(
+#         infrastructure, 
+#         levels = c("water", "electricity", "sanitation"),
+#         labels = c("Water", "Electricity", "Sanitation")
+#       )
+#   ) %>%
+#   ggplot(aes(year, population_percent, color = country)) +
+#   geom_line() +
+#   geom_point() +
+#   facet_grid(rows = vars(infrastructure), cols = vars(u_r)) +
+#   scale_x_continuous(
+#     breaks = scales::breaks_width(4),
+#     minor_breaks = NULL
+#   ) +
+#   scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+#   labs(
+#     title = "Percent of population with access to infrastructure across world regions",
+#     x = "Year",
+#     y = "Access to Infrastructure (Percent of Population)",
+#     color = "Region",
+#     captions = "Source: World Bank Data"
+#   )
+```
+
+```{r}
+q3.2 <- 
+  q2 %>% 
+  filter(
+    !(iso2c %in% group_codes),
+    year %in% c("2007", "2017")
+  ) %>%
+  mutate(
+    u_r = ordered(
+      u_r,
+      levels = c("urban", "rural"),
+      labels = c("Urban", "Rural")
+    ),
+    infrastructure = 
+      ordered(
+        infrastructure, 
+        levels = c("water", "electricity", "sanitation"),
+        labels = c("Water", "Electricity", "Sanitation")
+      )
+  ) %>% 
+  drop_na(population_percent) %>%
+  group_by(infrastructure, u_r, iso2c) %>% 
+  arrange(iso2c, infrastructure, u_r, year) %>% 
+  summarize(
+    decade_change = 
+      last(population_percent, year) - first(population_percent, year)
+  ) %>% 
+  ungroup() %>% 
+  ggplot(aes(decade_change)) +
+  geom_histogram(binwidth = 5) +
+  geom_vline(
+    data = 
+      . %>% 
+      group_by(infrastructure, u_r) %>% 
+      summarize(median = median(decade_change)),
+    aes(xintercept = median, color = "median")
+  ) +
+  geom_vline(xintercept = 0, color = "black") +
+  facet_grid(rows = vars(infrastructure), cols = vars(u_r)) +
+  scale_x_continuous(
+    breaks = scales::breaks_width(25),
+    labels = scales::percent_format(scale = 1)
+  ) +
+  theme(
+    legend.position = "bottom"
+  ) +
+  labs(
+    title = str_glue("Distribution of change to access to infrastructure from {YEAR_MIN} - {YEAR_MAX}"),
+    x = "Change to Access to Infrastructure (Percent of Population)",
+    y = NULL,
+    color = NULL
+  )
+```
+<!-- solution-begin -->
+
+* Mostly positive change in the decade
+* Rural change is greater
+<!-- solution-end -->

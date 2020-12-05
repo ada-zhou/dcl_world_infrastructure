@@ -1,0 +1,295 @@
+---
+title: Percent of population living in slums 
+author: Ada Zhou
+date: "`r Sys.Date()`"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Libraries
+library(tidyverse)
+
+# Parameters
+file_data <- here::here("c01-own/data/slum_pop_percent.rds")
+
+world_regions <- 
+  c(
+    "8S",
+    "ZG",
+    "Z4",
+    "ZQ",
+    "Z7",
+    "ZJ",
+    "XU"
+  )
+
+group_codes <- 
+  c(
+    "1A",
+    "S3",
+    "B8",
+    "V2",
+    "Z4",
+    "4E",
+    "T4",
+    "XC",
+    "Z7",
+    "7E",
+    "T7",
+    "EU",
+    "F1",
+    "XE",
+    "XD",
+    "XF",
+    "ZT",
+    "XH",
+    "XI",
+    "XG",
+    "V3",
+    "ZJ",
+    "XJ",
+    "T2",
+    "XL",
+    "XO",
+    "XM",
+    "XN",
+    "ZQ",
+    "XQ",
+    "T3",
+    "XP", #MIDDLE INCOME
+    "XU",
+    "XY",
+    "OE",
+    "S4",
+    "S2",
+    "V4",
+    "V1",
+    "S1",
+    "8S",
+    "T5",
+    "ZG",
+    "ZF",
+    "T6",
+    "XT", #UPPER MIDDLE INCOME
+    "1W"
+  )
+
+#===============================================================================
+
+df <- read_rds(file_data)
+```
+
+### Check Data
+
+```{r}
+df %>% 
+  summary()
+
+df %>% 
+  distinct(iso2c) %>% 
+  count()
+
+df %>% 
+  filter(is.na(slum_pop_percent)) %>% 
+  count(year) 
+
+df <- 
+  df %>% 
+  drop_na(slum_pop_percent)
+
+df %>% 
+  count(year) 
+```
+
+### Region
+
+```{r}
+df %>% 
+  filter(iso2c %in% world_regions) %>% 
+  ggplot(aes(year, slum_pop_percent, color = country)) +
+  geom_line() +
+  geom_point()
+```
+
+
+
+### Individual country data
+
+
+```{r}
+df %>% 
+  filter(!(iso2c %in% group_codes)) %>% 
+  count(country)
+
+df %>% 
+  filter(!(iso2c %in% group_codes)) %>% 
+  count(year)
+```
+
+```{r}
+df %>% 
+  filter(
+    !(iso2c %in% group_codes),
+    year %in% c("2005", "2014")
+  ) %>%
+  pivot_wider(
+    names_from = year, 
+    names_prefix = "year_", 
+    values_from = slum_pop_percent
+  ) %>% 
+  drop_na(year_2014, year_2005) %>% 
+  mutate(
+    country = fct_reorder(country, year_2014),
+    diff = year_2014 - year_2005
+  ) %>% 
+  top_n(30, year_2014) %>% 
+  ggplot(aes(y = country)) +
+  geom_vline(aes(xintercept = median(year_2005), color = "2005")) +
+  geom_vline(aes(xintercept = median(year_2014), color = "2014")) +
+  geom_segment(
+    aes(
+      x = year_2005, 
+      xend = year_2014, 
+      y = country, 
+      yend = country
+    )
+  ) +
+  geom_point(aes(x = year_2014, color = "2014")) +
+  geom_point(aes(x = year_2005, color = "2005")) 
+```
+
+### Increase in slum population
+
+```{r}
+greatest_change <- 
+  df %>% 
+  filter(
+    !(iso2c %in% group_codes),
+    year %in% c("2005", "2014")
+  ) %>%
+  pivot_wider(
+    names_from = year, 
+    names_prefix = "year_", 
+    values_from = slum_pop_percent
+  ) %>% 
+  drop_na(year_2014, year_2005) %>% 
+  mutate(
+    country = fct_reorder(country, year_2014),
+    diff = year_2014 - year_2005
+  ) %>% 
+  filter(diff > 0)
+
+graph_country <- function(iso2c, country) {
+  df %>% 
+    filter(
+      iso2c == {{iso2c}}
+    ) %>% 
+    drop_na(slum_pop_percent) %>% 
+    ggplot(aes(x = year, y = slum_pop_percent)) +
+    geom_line() +
+    geom_point() +
+    scale_x_continuous(breaks = scales::breaks_width(2)) +
+    labs(
+      title = str_glue("{country} data")
+    )
+}
+
+greatest_change_plots <- 
+  greatest_change %>% 
+  select(iso2c, country) %>% 
+  pmap(graph_country)
+
+greatest_change_plots %>% walk(print)
+
+```
+
+```{r}
+df %>% 
+  filter(country == "India") %>% 
+  drop_na(slum_pop_percent) %>% 
+  ggplot(aes(year, slum_pop_percent)) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Percent of Population Living in Slums in India"
+  )
+```
+
+
+```{r}
+
+df %>% 
+  filter(country == "Mexico") %>% 
+  drop_na(slum_pop_percent) %>% 
+  ggplot(aes(year, slum_pop_percent)) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Percent of Population Living in Slums in Mexico"
+  )
+  
+```
+
+```{r, fig.height=10, fig.width=10}
+
+df_avg_change <- 
+  df %>% 
+  drop_na(slum_pop_percent) %>% 
+  filter(!(iso2c %in% group_codes)) %>% 
+  group_by(iso2c) %>% 
+  arrange(iso2c, year) %>% 
+  mutate(
+    slum_pop_percent_next = lead(slum_pop_percent),
+    slum_pop_percent_diff = slum_pop_percent_next - slum_pop_percent,
+    year_next = lead(year),
+    year_diff = year_next - year,
+    avg_change = slum_pop_percent_diff / year_diff
+  ) %>% 
+  drop_na(year_diff, avg_change) %>% 
+  ungroup()
+
+df_top_increase <- 
+  df_avg_change %>% 
+  top_n(10, avg_change)
+
+df_top_decrease <- 
+  df_avg_change %>% 
+  top_n(-10, avg_change)
+
+df_top_increase %>% 
+  bind_rows(df_top_decrease) %>% 
+  mutate(
+    country = fct_reorder(as.factor(country), avg_change),
+    facet = if_else(avg_change > 0, "Increase", "Decrease")
+  ) %>% 
+  ggplot(aes(y = country)) +
+  geom_segment(
+    aes(
+      x = slum_pop_percent, 
+      xend = slum_pop_percent + avg_change, 
+      y = country, 
+      yend = country
+    ),
+    arrow = arrow(length = unit(0.1, "cm"))
+  ) +
+  geom_point(aes(x = slum_pop_percent), color = "red", size = 0.8) +
+  facet_wrap(vars(facet), ncol = 1, scales = "free_y")
+```
+
+```{r}
+
+df %>% 
+  filter(
+    !(iso2c %in% group_codes),
+    year == "2014"
+  ) %>%
+  top_n(-50, slum_pop_percent)
+
+```
+
